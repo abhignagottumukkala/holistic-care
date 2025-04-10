@@ -111,6 +111,25 @@ export default function SymptomAnalysisPage() {
 
   const saveToDatabase = async (data) => {
     try {
+      // Get the authenticated user from localStorage
+      const userString = localStorage.getItem('user');
+      let userId = data.id; // Default to analysis ID if no user is logged in
+      
+      // Get auth token if available
+      const token = localStorage.getItem('token');
+      
+      // If user is logged in, use their MongoDB ID
+      if (userString) {
+        try {
+          const userData = JSON.parse(userString);
+          if (userData && userData.id) {
+            userId = userData.id; // Use the MongoDB user ID
+          }
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+      
       // Extract the relevant symptom data for our MongoDB schema
       const selectedSymptomLabels = data.primarySymptoms.map(
         symptomId => commonSymptoms.find(s => s.id === symptomId)?.label
@@ -118,19 +137,26 @@ export default function SymptomAnalysisPage() {
 
       // Prepare the data to be sent to our API
       const symptomData = {
-        userId: data.id, // Using the analysis ID as user ID for now
+        userId: userId, // Now using the MongoDB user ID when available
         symptoms: selectedSymptomLabels,
         severity: data.severity,
         duration: data.duration,
         additionalNotes: data.otherSymptoms
       };
 
+      // Prepare headers with authorization if token exists
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       // Send the data to our API endpoint
       const response = await fetch('/api/symptoms', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify(symptomData),
       });
 

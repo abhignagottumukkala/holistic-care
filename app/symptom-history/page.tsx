@@ -19,8 +19,36 @@ export default function SymptomHistoryPage() {
     const localData = JSON.parse(localStorage.getItem("symptomAnalyses") || "[]")
     setLocalHistory(localData)
     
-    // If we have at least one analysis, use its ID to fetch from DB
-    if (localData.length > 0) {
+    // Get user ID from localStorage
+    const userString = localStorage.getItem("user")
+    
+    if (userString) {
+      try {
+        const userData = JSON.parse(userString)
+        if (userData && userData.id) {
+          // Use MongoDB user ID if logged in
+          setUserId(userData.id)
+          fetchFromDatabase(userData.id)
+        } else if (localData.length > 0) {
+          // Fallback to analysis ID if no user ID found
+          setUserId(localData[0].id)
+          fetchFromDatabase(localData[0].id)
+        } else {
+          setIsLoading(false)
+        }
+      } catch (e) {
+        console.error('Error parsing user data:', e)
+        
+        // Fallback to analysis ID if user data couldn't be parsed
+        if (localData.length > 0) {
+          setUserId(localData[0].id)
+          fetchFromDatabase(localData[0].id)
+        } else {
+          setIsLoading(false)
+        }
+      }
+    } else if (localData.length > 0) {
+      // No user logged in, use analysis ID
       setUserId(localData[0].id)
       fetchFromDatabase(localData[0].id)
     } else {
@@ -31,7 +59,19 @@ export default function SymptomHistoryPage() {
   const fetchFromDatabase = async (id) => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/symptoms?userId=${id}`)
+      
+      // Get auth token if available
+      const token = localStorage.getItem('token');
+      
+      // Prepare headers with authorization if token exists
+      const headers = new Headers();
+      if (token) {
+        headers.append('Authorization', `Bearer ${token}`);
+      }
+      
+      const response = await fetch(`/api/symptoms?userId=${id}`, {
+        headers: headers
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch symptoms from database')
